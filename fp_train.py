@@ -116,83 +116,84 @@ def test(epoch, args, model, data_loader, fp_dx, fp_target, test_length=None):
         if args.cuda:
             data, target = data.cuda(), target.cuda()
 
-        data, target = Variable(data, volatile=True), Variable(target)
+        data, target = Variable(data), Variable(target)
 
-        data_np = util.var2np(data, args.cuda)
-        real_bs = data_np.shape[0]
+        with torch.no_grad():
+            data_np = util.var2np(data, args.cuda)
+            real_bs = data_np.shape[0]
 
-        logits = model(data)
-        output = F.log_softmax(logits)
-        logits_norm = logits * torch.norm(logits, 2, 1, keepdim=True).reciprocal().expand(real_bs, args.num_class)
+            logits = model(data)
+            output = F.log_softmax(logits)
+            logits_norm = logits * torch.norm(logits, 2, 1, keepdim=True).reciprocal().expand(real_bs, args.num_class)
 
 
-        fp_target_var = torch.index_select(fp_target, 0, target)
+            fp_target_var = torch.index_select(fp_target, 0, target)
 
-        # votes_dict = defaultdict(lambda: {i:0 for i in range(args.num_class)})
-        loss_n = torch.nn.MSELoss()
-        for i in range(args.num_dx):
-            dx = fp_dx[i]
-            fp_target_var_i = fp_target_var[:,i,:]
+            # votes_dict = defaultdict(lambda: {i:0 for i in range(args.num_class)})
+            loss_n = torch.nn.MSELoss()
+            for i in range(args.num_dx):
+                dx = fp_dx[i]
+                fp_target_var_i = fp_target_var[:,i,:]
 
-            logits_p = model(data + util.np2var(dx, args.cuda))
-            output_p = F.log_softmax(logits_p)
-            logits_p_norm = logits_p * torch.norm(logits_p, 2, 1, keepdim=True).reciprocal().expand(real_bs, args.num_class)
+                logits_p = model(data + util.np2var(dx, args.cuda))
+                output_p = F.log_softmax(logits_p)
+                logits_p_norm = logits_p * torch.norm(logits_p, 2, 1, keepdim=True).reciprocal().expand(real_bs, args.num_class)
 
-            logits_p_class = logits_p_norm.data.max(0, keepdim=True)[1]
+                logits_p_class = logits_p_norm.data.max(0, keepdim=True)[1]
 
-            diff = logits_p_norm - logits_norm
-            diff_class = diff.data.max(1, keepdim=True)[1]
-            #diff = diff * torch.norm(diff, 2, 1, keepdim=True).reciprocal().expand(real_bs, args.num_class)
+                diff = logits_p_norm - logits_norm
+                diff_class = diff.data.max(1, keepdim=True)[1]
+                #diff = diff * torch.norm(diff, 2, 1, keepdim=True).reciprocal().expand(real_bs, args.num_class)
 
-            fp_target_class = fp_target_var_i.data.max(1, keepdim=True)[1]
-            loss_y += loss_n(logits_p_norm, fp_target_var_i)
-            loss_dy += 10.0*loss_n(diff, fp_target_var_i)
-            num_same_argmax += torch.sum(diff_class == fp_target_class)
+                fp_target_class = fp_target_var_i.data.max(1, keepdim=True)[1]
+                loss_y += loss_n(logits_p_norm, fp_target_var_i)
+                loss_dy += 10.0*loss_n(diff, fp_target_var_i)
+                num_same_argmax += torch.sum(diff_class == fp_target_class)
 
-            # for sample_num in range(real_bs):
-            #     fingerprint_class = np.argmax(util.var2np(diff, args.cuda)[sample_num,:])
-            #     fingerprinted_class = np.argmax(fp_target_var[i,sample_num,:])
-            #     fingerprint_accuracy.append((fingerprint_class,fingerprinted_class))
+                # for sample_num in range(real_bs):
+                #     fingerprint_class = np.argmax(util.var2np(diff, args.cuda)[sample_num,:])
+                #     fingerprinted_class = np.argmax(fp_target_var[i,sample_num,:])
+                #     fingerprint_accuracy.append((fingerprint_class,fingerprinted_class))
 
-            #     votes_dict[sample_num][fingerprint_class] += 1
-        test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
-        pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
-        correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+                #     votes_dict[sample_num][fingerprint_class] += 1
+            test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
+            pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
+            correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
-        # print(e, "pred:", pred, "label:", target, correct)
-        # pred_fp = torch.from_numpy(get_majority(votes_dict).astype(int))
-        # correct_fp += pred_fp.eq(target.data.view_as(pred_fp)).cpu().sum()
-    if(test_length is None):
-        test_length = len(data_loader.dataset)
-    test_loss /= test_length
+            # print(e, "pred:", pred, "label:", target, correct)
+            # pred_fp = torch.from_numpy(get_majority(votes_dict).astype(int))
+            # correct_fp += pred_fp.eq(target.data.view_as(pred_fp)).cpu().sum()
+        if(test_length is None):
+            test_length = len(data_loader.dataset)
+        test_loss /= test_length
 
-    loss_y /= test_length
-    loss_dy /= test_length
-    argmax_acc = num_same_argmax*1.0 / (test_length * args.num_dx)
+        loss_y /= test_length
+        loss_dy /= test_length
+        argmax_acc = num_same_argmax*1.0 / (test_length * args.num_dx)
 
-    print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-        test_loss, correct, test_length,
-        100. * correct / test_length))
+        print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
+            test_loss, correct, test_length,
+            100. * correct / test_length))
 
-    # print('\nTest set: Average loss: {:.4f}, Fingerprint Accuracy: {}/{} ({:.0f}%)\n'.format(
-    #     test_loss, correct_fp, len(data_loader.dataset),
-    #     100. * correct_fp / len(data_loader.dataset)))
+        # print('\nTest set: Average loss: {:.4f}, Fingerprint Accuracy: {}/{} ({:.0f}%)\n'.format(
+        #     test_loss, correct_fp, len(data_loader.dataset),
+        #     100. * correct_fp / len(data_loader.dataset)))
 
-    print('Fingerprints (on test): L(fp, y) loss: {:.4f}, L(fp, dy) loss: {:.4f}, argmax y = argmax f(x+dx) Accuracy: {}/{} ({:.0f}%)'.format(
-        loss_y.data.cpu().numpy()[0], loss_dy.data.cpu().numpy()[0], num_same_argmax, len(data_loader.dataset) * args.num_dx,
-        100. * argmax_acc))
+        print('Fingerprints (on test): L(fp, y) loss: {:.4f}, L(fp, dy) loss: {:.4f}, argmax y = argmax f(x+dx) Accuracy: {}/{} ({:.0f}%)'.format(
+            loss_y.cpu().item(), loss_dy.cpu().item(), num_same_argmax, len(data_loader.dataset) * args.num_dx,
+            100. * argmax_acc))
 
-    result = {"epoch": epoch,
-              "test-loss": test_loss,
-              "test-correct": correct,
-              "test-N": test_length,
-              "test-acc": correct/test_length,
-              "fingerprint-loss (y)": loss_y.item(),
-              "fingerprint-loss (dy)": loss_dy.item(),
-              "fingerprint-loss (argmax)": argmax_acc,
-              "args": args
-              }
-    path = os.path.join(args.log_dir, "train", "log-ep-{}.pkl".format(epoch))
-    print("Saving log in", path)
-    pickle.dump(result, open(path, "wb"))
+        result = {"epoch": epoch,
+                  "test-loss": test_loss,
+                  "test-correct": correct,
+                  "test-N": test_length,
+                  "test-acc": correct/test_length,
+                  "fingerprint-loss (y)": loss_y.item(),
+                  "fingerprint-loss (dy)": loss_dy.item(),
+                  "fingerprint-loss (argmax)": argmax_acc,
+                  "args": args
+                  }
+        path = os.path.join(args.log_dir, "train", "log-ep-{}.pkl".format(epoch))
+        print("Saving log in", path)
+        pickle.dump(result, open(path, "wb"))
     return test_loss

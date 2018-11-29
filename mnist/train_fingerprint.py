@@ -49,7 +49,7 @@ parser.add_argument('--num-dx', type=int, default=5)
 parser.add_argument('--num-class', type=int, default=10)
 
 parser.add_argument('--name', default="dataset-name")
-parser.add_argument("--data-dir", default='../MNIST_data')
+parser.add_argument("--data-dir", default='MNIST_data')
 parser.add_argument("--log-dir")
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
