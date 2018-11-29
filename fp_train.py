@@ -148,7 +148,8 @@ def test(epoch, args, model, data_loader, fp_dx, fp_target, test_length=None):
                 fp_target_class = fp_target_var_i.data.max(1, keepdim=True)[1]
                 loss_y += loss_n(logits_p_norm, fp_target_var_i)
                 loss_dy += 10.0*loss_n(diff, fp_target_var_i)
-                num_same_argmax += torch.sum(diff_class == fp_target_class)
+                num_same_argmax += torch.sum(
+                        diff_class == fp_target_class).item()
 
                 # for sample_num in range(real_bs):
                 #     fingerprint_class = np.argmax(util.var2np(diff, args.cuda)[sample_num,:])
