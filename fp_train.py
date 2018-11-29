@@ -81,10 +81,10 @@ def train(epoch, args, model, optimizer, data_loader, fp_dx, fp_target, ds_name 
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss vanilla: {:.3f} fp-y: {:.3f} fp-dy: {:.3f} Total Loss: {:.3f}'.format(
                 epoch, batch_idx * len(x), len(data_loader.dataset),
                 100. * batch_idx / len(data_loader),
-                loss_vanilla.data[0],
-                loss_fingerprint_y.data[0],
-                loss_fingerprint_dy.data[0],
-                loss.data[0]))
+                loss_vanilla.item(),
+                loss_fingerprint_y.item(),
+                loss_fingerprint_dy.item(),
+                loss.item()))
 
 def get_majority(votes_dict):
     real_bs=len(votes_dict.keys())
@@ -155,7 +155,7 @@ def test(epoch, args, model, data_loader, fp_dx, fp_target, test_length=None):
             #     fingerprint_accuracy.append((fingerprint_class,fingerprinted_class))
 
             #     votes_dict[sample_num][fingerprint_class] += 1
-        test_loss += F.nll_loss(output, target, size_average=False).data[0] # sum up batch loss
+        test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
@@ -187,8 +187,8 @@ def test(epoch, args, model, data_loader, fp_dx, fp_target, test_length=None):
               "test-correct": correct,
               "test-N": test_length,
               "test-acc": correct/test_length,
-              "fingerprint-loss (y)": loss_y.data[0],
-              "fingerprint-loss (dy)": loss_dy.data[0],
+              "fingerprint-loss (y)": loss_y.item(),
+              "fingerprint-loss (dy)": loss_dy.item(),
               "fingerprint-loss (argmax)": argmax_acc,
               "args": args
               }
